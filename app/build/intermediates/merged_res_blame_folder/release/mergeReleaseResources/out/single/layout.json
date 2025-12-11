@@ -1,0 +1,14 @@
+[
+    {
+        "merged": "com.example.eventapp-mergeReleaseResources-68:/layout/item_event.xml",
+        "source": "com.example.eventapp-main-70:/layout/item_event.xml"
+    },
+    {
+        "merged": "com.example.eventapp-mergeReleaseResources-68:/layout/activity_main.xml",
+        "source": "com.example.eventapp-main-70:/layout/activity_main.xml"
+    },
+    {
+        "merged": "com.example.eventapp-mergeReleaseResources-68:/layout/activity_create_event.xml",
+        "source": "com.example.eventapp-main-70:/layout/activity_create_event.xml"
+    }
+]

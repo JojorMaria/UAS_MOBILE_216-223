@@ -1,0 +1,548 @@
+Index: app/src/main/java/com/example/eventapp/MainActivity.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.example.eventapp\r\n\r\nimport android.os.Bundle\r\nimport androidx.appcompat.app.AppCompatActivity\r\nimport androidx.lifecycle.lifecycleScope\r\nimport androidx.recyclerview.widget.LinearLayoutManager\r\nimport com.example.eventapp.adapter.EventAdapter\r\nimport com.example.eventapp.databinding.ActivityMainBinding\r\nimport com.example.eventapp.network.ApiClient\r\nimport kotlinx.coroutines.launch\r\nimport android.content.Intent\r\n\r\nclass MainActivity : AppCompatActivity() {\r\n\r\n    private lateinit var binding: ActivityMainBinding\r\n\r\n    override fun onCreate(savedInstanceState: Bundle?) {\r\n        super.onCreate(savedInstanceState)\r\n\r\n        binding = ActivityMainBinding.inflate(layoutInflater)\r\n        setContentView(binding.root)\r\n\r\n        // tombol\r\n        binding.btnOpenCreate.setOnClickListener {\r\n            startActivity(Intent(this, CreateEventActivity::class.java))\r\n        }\r\n\r\n        // rv\r\n        binding.rvEvents.layoutManager = LinearLayoutManager(this)\r\n    }\r\n\r\n    override fun onResume() {\r\n        super.onResume()\r\n        loadEvents()\r\n    }\r\n\r\n    private fun loadEvents() {\r\n        lifecycleScope.launch {\r\n            try {\r\n                val response = ApiClient.instance.getEvents()\r\n                val events = response.data\r\n\r\n                binding.rvEvents.adapter = EventAdapter(events)\r\n            } catch (e: Exception) {\r\n                e.printStackTrace()\r\n            }\r\n        }\r\n    }\r\n\r\n}\r\n
+===================================================================
+diff --git a/app/src/main/java/com/example/eventapp/MainActivity.kt b/app/src/main/java/com/example/eventapp/MainActivity.kt
+--- a/app/src/main/java/com/example/eventapp/MainActivity.kt	(revision 3b904abae77229f4a6547eca759b3cc1a5148855)
++++ b/app/src/main/java/com/example/eventapp/MainActivity.kt	(date 1765472235000)
+@@ -1,50 +1,192 @@
+ package com.example.eventapp
+ 
++import android.app.AlertDialog
+ import android.os.Bundle
++import android.widget.EditText
++import android.widget.LinearLayout
++import android.widget.Toast
+ import androidx.appcompat.app.AppCompatActivity
+ import androidx.lifecycle.lifecycleScope
+ import androidx.recyclerview.widget.LinearLayoutManager
+ import com.example.eventapp.adapter.EventAdapter
+ import com.example.eventapp.databinding.ActivityMainBinding
++import com.example.eventapp.model.Event
++import com.example.eventapp.model.EventRequest
+ import com.example.eventapp.network.ApiClient
+ import kotlinx.coroutines.launch
+-import android.content.Intent
+ 
+ class MainActivity : AppCompatActivity() {
+ 
+     private lateinit var binding: ActivityMainBinding
++    private val eventsList = mutableListOf<Event>()
++    private lateinit var adapter: EventAdapter
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+-
+         binding = ActivityMainBinding.inflate(layoutInflater)
+         setContentView(binding.root)
+ 
+-        // tombol
+-        binding.btnOpenCreate.setOnClickListener {
+-            startActivity(Intent(this, CreateEventActivity::class.java))
+-        }
+-
+-        // rv
++        adapter = EventAdapter(eventsList)
+         binding.rvEvents.layoutManager = LinearLayoutManager(this)
+-    }
++        binding.rvEvents.adapter = adapter
+ 
+-    override fun onResume() {
+-        super.onResume()
+         loadEvents()
++
++        binding.btnCreateEvent.setOnClickListener { showCreateEventDialog() }
++        binding.btnGetEventById.setOnClickListener { showGetEventByIdDialog() }
++        binding.btnGetEventByDate.setOnClickListener { showGetEventByDateDialog() }
+     }
+ 
+     private fun loadEvents() {
+         lifecycleScope.launch {
+             try {
+                 val response = ApiClient.instance.getEvents()
+-                val events = response.data
++                eventsList.clear()
++                response.data?.let { eventsList.addAll(it) }
++                adapter.notifyDataSetChanged()
++            } catch (e: Exception) {
++                e.printStackTrace()
++                Toast.makeText(this@MainActivity, "Failed to load events", Toast.LENGTH_SHORT).show()
++            }
++        }
++    }
++
++    // ---------------- CREATE EVENT ----------------
++    private fun showCreateEventDialog() {
++        val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
++
++        val inputTitle = EditText(this).apply { hint = "Judul Event" }
++        val inputDate = EditText(this).apply { hint = "Tanggal (YYYY-MM-DD)" }
++        val inputTime = EditText(this).apply { hint = "Waktu (HH:MM)" }
++        val inputLocation = EditText(this).apply { hint = "Lokasi Event" }
++        val inputDesc = EditText(this).apply { hint = "Deskripsi Event" }
++        val inputCapacity = EditText(this).apply { hint = "Kapasitas (angka)" }
++        val inputStatus = EditText(this).apply { hint = "Status (upcoming/ongoing/completed/cancelled)" }
++
++        layout.addView(inputTitle)
++        layout.addView(inputDate)
++        layout.addView(inputTime)
++        layout.addView(inputLocation)
++        layout.addView(inputDesc)
++        layout.addView(inputCapacity)
++        layout.addView(inputStatus)
++
++        AlertDialog.Builder(this)
++            .setTitle("Create Event")
++            .setView(layout)
++            .setPositiveButton("Submit") { _, _ ->
++                val title = inputTitle.text.toString().trim()
++                val date = inputDate.text.toString().trim()
++                val time = inputTime.text.toString().trim()
++                val location = inputLocation.text.toString().trim()
++                val description = inputDesc.text.toString().trim()
++                val capacity = inputCapacity.text.toString().toIntOrNull() ?: 0
++                val status = inputStatus.text.toString().trim().lowercase()
++
++                if (title.isEmpty() || date.isEmpty() || time.isEmpty() ||
++                    location.isEmpty() || description.isEmpty() ||
++                    capacity <= 0 || status !in listOf("upcoming","ongoing","completed","cancelled")
++                ) {
++                    Toast.makeText(this, "Isi semua field dengan benar!", Toast.LENGTH_SHORT).show()
++                    return@setPositiveButton
++                }
++
++                createEvent(title, date, time, location, description, capacity, status)
++            }
++            .setNegativeButton("Cancel", null)
++            .show()
++    }
++
++    private fun createEvent(title: String, date: String, time: String, location: String,
++                            description: String, capacity: Int, status: String) {
++        lifecycleScope.launch {
++            try {
++                val request = EventRequest(
++                    title = title,
++                    date = date,
++                    time = if (time.length == 5) "$time:00" else time,
++                    location = location,
++                    description = description,
++                    capacity = capacity,
++                    status = status
++                )
++                val response = ApiClient.instance.createEvent(request)
++
++                // Tambahkan response ke RecyclerView
++                eventsList.clear()
++                response.data?.let { eventsList.addAll(it) }
++                response.event?.let { eventsList.add(it) }
++                adapter.notifyDataSetChanged()
++
++                Toast.makeText(this@MainActivity, "Event berhasil dibuat!", Toast.LENGTH_SHORT).show()
++            } catch (e: Exception) {
++                e.printStackTrace()
++                Toast.makeText(this@MainActivity, "Gagal membuat event: ${e.message}", Toast.LENGTH_LONG).show()
++            }
++        }
++    }
++
++    // ---------------- GET EVENT BY ID ----------------
++    private fun showGetEventByIdDialog() {
++        val inputId = EditText(this).apply { hint = "Masukkan ID Event" }
++        AlertDialog.Builder(this)
++            .setTitle("Get Event by ID")
++            .setView(inputId)
++            .setPositiveButton("Cari") { _, _ ->
++                val id = inputId.text.toString().trim()
++                if (id.isEmpty()) {
++                    Toast.makeText(this, "ID tidak boleh kosong!", Toast.LENGTH_SHORT).show()
++                    return@setPositiveButton
++                }
++                getEventById(id)
++            }
++            .setNegativeButton("Cancel", null)
++            .show()
++    }
+ 
+-                binding.rvEvents.adapter = EventAdapter(events)
++    private fun getEventById(id: String) {
++        lifecycleScope.launch {
++            try {
++                val response = ApiClient.instance.getEventById(id = id)
++                eventsList.clear()
++                response.data?.let { eventsList.addAll(it) }
++                adapter.notifyDataSetChanged()
++            } catch (e: Exception) {
++                e.printStackTrace()
++                Toast.makeText(this@MainActivity, "Event tidak ditemukan", Toast.LENGTH_SHORT).show()
++            }
++        }
++    }
++
++    // ---------------- GET EVENT BY DATE ----------------
++    private fun showGetEventByDateDialog() {
++        val inputDate = EditText(this).apply { hint = "Masukkan tanggal (YYYY-MM-DD)" }
++        AlertDialog.Builder(this)
++            .setTitle("Get Event by Date")
++            .setView(inputDate)
++            .setPositiveButton("Cari") { _, _ ->
++                val date = inputDate.text.toString().trim()
++                if (date.isEmpty()) {
++                    Toast.makeText(this, "Tanggal tidak boleh kosong!", Toast.LENGTH_SHORT).show()
++                    return@setPositiveButton
++                }
++                getEventByDate(date)
++            }
++            .setNegativeButton("Cancel", null)
++            .show()
++    }
++
++    private fun getEventByDate(date: String) {
++        lifecycleScope.launch {
++            try {
++                val response = ApiClient.instance.getEventByDate(date = date)
++                eventsList.clear()
++                response.data?.let { eventsList.addAll(it) }
++                adapter.notifyDataSetChanged()
+             } catch (e: Exception) {
+                 e.printStackTrace()
++                Toast.makeText(this@MainActivity, "Tidak ada event di tanggal ini", Toast.LENGTH_SHORT).show()
+             }
+         }
+     }
+-
+ }
+Index: .idea/gradle.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<project version=\"4\">\r\n  <component name=\"GradleSettings\">\r\n    <option name=\"linkedExternalProjectsSettings\">\r\n      <GradleProjectSettings>\r\n        <option name=\"testRunner\" value=\"CHOOSE_PER_TEST\" />\r\n        <option name=\"externalProjectPath\" value=\"$PROJECT_DIR$\" />\r\n        <option name=\"gradleJvm\" value=\"#GRADLE_LOCAL_JAVA_HOME\" />\r\n        <option name=\"modules\">\r\n          <set>\r\n            <option value=\"$PROJECT_DIR$\" />\r\n            <option value=\"$PROJECT_DIR$/app\" />\r\n          </set>\r\n        </option>\r\n      </GradleProjectSettings>\r\n    </option>\r\n  </component>\r\n</project>
+===================================================================
+diff --git a/.idea/gradle.xml b/.idea/gradle.xml
+--- a/.idea/gradle.xml	(revision 3b904abae77229f4a6547eca759b3cc1a5148855)
++++ b/.idea/gradle.xml	(date 1765467849000)
+@@ -1,5 +1,6 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <project version="4">
++  <component name="GradleMigrationSettings" migrationVersion="1" />
+   <component name="GradleSettings">
+     <option name="linkedExternalProjectsSettings">
+       <GradleProjectSettings>
+Index: app/src/main/java/com/example/eventapp/model/EventResponse.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.example.eventapp.model\r\n\r\ndata class EventResponse(\r\n    val success: Boolean,\r\n    val message: String,\r\n    val data: List<Event>\r\n\r\n)\r\n\r\n
+===================================================================
+diff --git a/app/src/main/java/com/example/eventapp/model/EventResponse.kt b/app/src/main/java/com/example/eventapp/model/EventResponse.kt
+--- a/app/src/main/java/com/example/eventapp/model/EventResponse.kt	(revision 3b904abae77229f4a6547eca759b3cc1a5148855)
++++ b/app/src/main/java/com/example/eventapp/model/EventResponse.kt	(date 1765472165000)
+@@ -1,9 +1,7 @@
+ package com.example.eventapp.model
+ 
+ data class EventResponse(
+-    val success: Boolean,
+     val message: String,
+-    val data: List<Event>
+-
++    val data: List<Event>? = null, // untuk GET semua events atau by date
++    val event: Event? = null       // untuk POST createEvent (jika server kirim object tunggal)
+ )
+-
+Index: app/src/main/java/com/example/eventapp/network/ApiClient.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.example.eventapp.network\r\n\r\nimport retrofit2.Retrofit\r\nimport retrofit2.converter.gson.GsonConverterFactory\r\n\r\nobject ApiClient {\r\n\r\n    private const val BASE_URL = \"http://104.248.153.158/event-api/\"\r\n\r\n    val instance: ApiService by lazy {\r\n        Retrofit.Builder()\r\n            .baseUrl(BASE_URL)\r\n            .addConverterFactory(GsonConverterFactory.create())\r\n            .build()\r\n            .create(ApiService::class.java)\r\n    }\r\n}\r\n
+===================================================================
+diff --git a/app/src/main/java/com/example/eventapp/network/ApiClient.kt b/app/src/main/java/com/example/eventapp/network/ApiClient.kt
+--- a/app/src/main/java/com/example/eventapp/network/ApiClient.kt	(revision 3b904abae77229f4a6547eca759b3cc1a5148855)
++++ b/app/src/main/java/com/example/eventapp/network/ApiClient.kt	(date 1765472208000)
+@@ -4,7 +4,6 @@
+ import retrofit2.converter.gson.GsonConverterFactory
+ 
+ object ApiClient {
+-
+     private const val BASE_URL = "http://104.248.153.158/event-api/"
+ 
+     val instance: ApiService by lazy {
+Index: app/src/main/java/com/example/eventapp/network/ApiService.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.example.eventapp.network\r\n\r\nimport com.example.eventapp.model.Event\r\nimport com.example.eventapp.model.EventResponse\r\nimport retrofit2.http.*\r\n\r\n\r\ninterface ApiService {\r\n\r\n    @GET(\"api.php\")\r\n    suspend fun getEvents(\r\n        @Query(\"endpoint\") endpoint: String = \"events\"\r\n    ): EventResponse\r\n\r\n    @FormUrlEncoded\r\n    @POST(\"api.php\")\r\n    suspend fun createEvent(\r\n        @Field(\"endpoint\") endpoint: String = \"createEvent\",\r\n        @Field(\"title\") title: String,\r\n        @Field(\"date\") date: String,\r\n        @Field(\"time\") time: String,\r\n        @Field(\"location\") location: String,\r\n        @Field(\"description\") description: String,\r\n        @Field(\"capacity\") capacity: Int,\r\n        @Field(\"status\") status: String\r\n    ): EventResponse\r\n\r\n    @GET(\"api.php\")\r\n    suspend fun getEventById(\r\n        @Query(\"endpoint\") endpoint: String = \"eventById\",\r\n        @Query(\"id\") id: Int\r\n    ): EventResponse\r\n\r\n    @GET(\"api.php\")\r\n    suspend fun getEventByDate(\r\n        @Query(\"endpoint\") endpoint: String = \"eventByDate\",\r\n        @Query(\"date\") date: String\r\n    ): EventResponse\r\n}\r\n\r\n\r\n\r\n
+===================================================================
+diff --git a/app/src/main/java/com/example/eventapp/network/ApiService.kt b/app/src/main/java/com/example/eventapp/network/ApiService.kt
+--- a/app/src/main/java/com/example/eventapp/network/ApiService.kt	(revision 3b904abae77229f4a6547eca759b3cc1a5148855)
++++ b/app/src/main/java/com/example/eventapp/network/ApiService.kt	(date 1765472191000)
+@@ -1,34 +1,24 @@
+ package com.example.eventapp.network
+ 
+-import com.example.eventapp.model.Event
++import com.example.eventapp.model.EventRequest
+ import com.example.eventapp.model.EventResponse
+-import retrofit2.http.*
+-
++import retrofit2.http.Body
++import retrofit2.http.GET
++import retrofit2.http.POST
++import retrofit2.http.Query
+ 
+ interface ApiService {
+ 
+     @GET("api.php")
+-    suspend fun getEvents(
+-        @Query("endpoint") endpoint: String = "events"
+-    ): EventResponse
++    suspend fun getEvents(@Query("endpoint") endpoint: String = "events"): EventResponse
+ 
+-    @FormUrlEncoded
+     @POST("api.php")
+-    suspend fun createEvent(
+-        @Field("endpoint") endpoint: String = "createEvent",
+-        @Field("title") title: String,
+-        @Field("date") date: String,
+-        @Field("time") time: String,
+-        @Field("location") location: String,
+-        @Field("description") description: String,
+-        @Field("capacity") capacity: Int,
+-        @Field("status") status: String
+-    ): EventResponse
++    suspend fun createEvent(@Body event: EventRequest): EventResponse
+ 
+     @GET("api.php")
+     suspend fun getEventById(
+         @Query("endpoint") endpoint: String = "eventById",
+-        @Query("id") id: Int
++        @Query("id") id: String
+     ): EventResponse
+ 
+     @GET("api.php")
+@@ -37,6 +27,3 @@
+         @Query("date") date: String
+     ): EventResponse
+ }
+-
+-
+-
+Index: app/build.gradle.kts
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>plugins {\r\n    alias(libs.plugins.android.application)\r\n    alias(libs.plugins.kotlin.android)\r\n    alias(libs.plugins.kotlin.compose)\r\n}\r\n\r\nandroid {\r\n    namespace = \"com.example.eventapp\"\r\n    compileSdk = 34\r\n\r\n    defaultConfig {\r\n        applicationId = \"com.example.eventapp\"\r\n        minSdk = 24\r\n        targetSdk = 34\r\n        versionCode = 1\r\n        versionName = \"1.0\"\r\n\r\n        testInstrumentationRunner = \"androidx.test.runner.AndroidJUnitRunner\"\r\n    }\r\n\r\n    buildTypes {\r\n        release {\r\n            isMinifyEnabled = false\r\n        }\r\n\r\n    }\r\n    buildFeatures {\r\n        viewBinding = true\r\n        compose =true\r\n        dataBinding = true\r\n\r\n\r\n    }\r\n\r\n    compileOptions {\r\n        sourceCompatibility = JavaVersion.VERSION_17\r\n        targetCompatibility = JavaVersion.VERSION_17\r\n    }\r\n\r\n    kotlinOptions {\r\n        jvmTarget = \"17\"\r\n    }\r\n}\r\n\r\ndependencies {\r\n\r\n    implementation (\"androidx.compose.ui:ui:1.5.3\")\r\n    implementation (\"androidx.compose.material3:material3:1.2.0\")\r\n    implementation (\"androidx.compose.ui:ui-tooling-preview:1.5.3\")\r\n    debugImplementation (\"androidx.compose.ui:ui-tooling:1.5.3\")\r\n    // AndroidX core\r\n    implementation(\"androidx.core:core-ktx:1.12.0\")\r\n    implementation(\"androidx.appcompat:appcompat:1.6.1\")\r\n    implementation(\"com.google.android.material:material:1.10.0\")\r\n    implementation(\"androidx.constraintlayout:constraintlayout:2.1.4\")\r\n\r\n    // RecyclerView\r\n    implementation(\"androidx.recyclerview:recyclerview:1.3.1\")\r\n\r\n    // CardView\r\n    implementation(\"androidx.cardview:cardview:1.0.0\")\r\n\r\n\r\n    // Retrofit\r\n    implementation(\"com.squareup.retrofit2:retrofit:2.9.0\")\r\n    implementation(\"com.squareup.retrofit2:converter-gson:2.9.0\")\r\n\r\n    // Coroutines\r\n    implementation(\"org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3\")\r\n\r\n    // Navigation\r\n    implementation(\"androidx.navigation:navigation-fragment-ktx:2.7.4\")\r\n    implementation(\"androidx.navigation:navigation-ui-ktx:2.7.4\")\r\n\r\n    // LiveData & ViewModel\r\n    implementation(\"androidx.lifecycle:lifecycle-livedata-ktx:2.6.2\")\r\n    implementation(\"androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2\")\r\n\r\n    // Testing\r\n    testImplementation(\"junit:junit:4.13.2\")\r\n    androidTestImplementation(\"androidx.test.ext:junit:1.1.5\")\r\n    androidTestImplementation(\"androidx.test.espresso:espresso-core:3.5.1\")\r\n}\r\n
+===================================================================
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+--- a/app/build.gradle.kts	(revision 3b904abae77229f4a6547eca759b3cc1a5148855)
++++ b/app/build.gradle.kts	(date 1765466700000)
+@@ -3,33 +3,25 @@
+     alias(libs.plugins.kotlin.android)
+     alias(libs.plugins.kotlin.compose)
+ }
+-
+ android {
+     namespace = "com.example.eventapp"
+-    compileSdk = 34
++    compileSdk = 36   // update ke 36
+ 
+     defaultConfig {
+         applicationId = "com.example.eventapp"
+         minSdk = 24
+-        targetSdk = 34
++        targetSdk = 36   // update ke 36
+         versionCode = 1
+         versionName = "1.0"
+-
+-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+     }
+-
+-    buildTypes {
+-        release {
+-            isMinifyEnabled = false
+-        }
+ 
+-    }
+     buildFeatures {
+-        viewBinding = true
+-        compose =true
+-        dataBinding = true
++        viewBinding = true      // kamu pakai RecyclerView XML → wajib hidup
++        compose = true          // biar bisa pakai UI Compose juga
++    }
+ 
+-
++    composeOptions {
++        kotlinCompilerExtensionVersion = "1.5.3" // versi yang cocok untuk Kotlin 2.0.21
+     }
+ 
+     compileOptions {
+@@ -44,40 +36,32 @@
+ 
+ dependencies {
+ 
+-    implementation ("androidx.compose.ui:ui:1.5.3")
+-    implementation ("androidx.compose.material3:material3:1.2.0")
+-    implementation ("androidx.compose.ui:ui-tooling-preview:1.5.3")
+-    debugImplementation ("androidx.compose.ui:ui-tooling:1.5.3")
+-    // AndroidX core
+-    implementation("androidx.core:core-ktx:1.12.0")
+-    implementation("androidx.appcompat:appcompat:1.6.1")
+-    implementation("com.google.android.material:material:1.10.0")
+-    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
++    // BOM Compose
++    implementation(platform(libs.androidx.compose.bom))
+ 
+-    // RecyclerView
+-    implementation("androidx.recyclerview:recyclerview:1.3.1")
++    // Compose library
++    implementation(libs.androidx.activity.compose)
++    implementation(libs.androidx.compose.ui)
++    implementation(libs.androidx.compose.ui.graphics)
++    implementation(libs.androidx.compose.ui.tooling.preview)
++    implementation(libs.androidx.compose.material3)
+ 
+-    // CardView
++    debugImplementation(libs.androidx.compose.ui.tooling)
++    debugImplementation(libs.androidx.compose.ui.test.manifest)
++
++    // RecyclerView & ViewBinding
++    implementation("androidx.recyclerview:recyclerview:1.3.2")
+     implementation("androidx.cardview:cardview:1.0.0")
+-
+-
+-    // Retrofit
+     implementation("com.squareup.retrofit2:retrofit:2.9.0")
+     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+-
+-    // Coroutines
+-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+-
+-    // Navigation
+-    implementation("androidx.navigation:navigation-fragment-ktx:2.7.4")
+-    implementation("androidx.navigation:navigation-ui-ktx:2.7.4")
+-
+-    // LiveData & ViewModel
+-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.6.2")
+-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2")
++    // Android Core
++    implementation(libs.androidx.core.ktx)
++    implementation(libs.androidx.lifecycle.runtime.ktx)
++    implementation("androidx.appcompat:appcompat:1.6.1")
++    implementation("com.google.android.material:material:1.10.0")
+ 
+     // Testing
+-    testImplementation("junit:junit:4.13.2")
+-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
++    testImplementation(libs.junit)
++    androidTestImplementation(libs.androidx.junit)
++    androidTestImplementation(libs.androidx.espresso.core)
+ }
+Index: app/src/main/AndroidManifest.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\r\n    package=\"com.example.eventapp\">\r\n\r\n    <uses-permission android:name=\"android.permission.INTERNET\"/>\r\n\r\n    <application\r\n        android:theme=\"@style/Theme.EventApp\"\r\n        android:allowBackup=\"true\"\r\n        android:supportsRtl=\"true\">\r\n\r\n        <activity android:name=\".MainActivity\"\r\n            android:exported=\"true\">\r\n\r\n            <intent-filter>\r\n                <action android:name=\"android.intent.action.MAIN\" />\r\n                <category android:name=\"android.intent.category.LAUNCHER\" />\r\n            </intent-filter>\r\n        </activity>\r\n        <activity android:name=\".CreateEventActivity\" />\r\n\r\n    </application>\r\n\r\n</manifest>\r\n
+===================================================================
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+--- a/app/src/main/AndroidManifest.xml	(revision 3b904abae77229f4a6547eca759b3cc1a5148855)
++++ b/app/src/main/AndroidManifest.xml	(date 1765470950000)
+@@ -7,7 +7,10 @@
+     <application
+         android:theme="@style/Theme.EventApp"
+         android:allowBackup="true"
+-        android:supportsRtl="true">
++        android:supportsRtl="true"
++        android:networkSecurityConfig="@xml/network_security_config"
++        android:usesCleartextTraffic="true">
++
+ 
+         <activity android:name=".MainActivity"
+             android:exported="true">
+@@ -17,7 +20,7 @@
+                 <category android:name="android.intent.category.LAUNCHER" />
+             </intent-filter>
+         </activity>
+-        <activity android:name=".CreateEventActivity" />
++
+ 
+     </application>
+ 
+Index: app/src/main/java/com/example/eventapp/model/Event.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.example.eventapp.model\r\n\r\ndata class Event(\r\n    val id: Int,\r\n    val title: String,\r\n    val date: String,\r\n    val time: String,\r\n    val location: String,\r\n    val description: String,\r\n    val capacity: Int?,\r\n    val status: String,\r\n    val created_at: String,\r\n    val updated_at: String\r\n)\r\n\r\n\r\n
+===================================================================
+diff --git a/app/src/main/java/com/example/eventapp/model/Event.kt b/app/src/main/java/com/example/eventapp/model/Event.kt
+--- a/app/src/main/java/com/example/eventapp/model/Event.kt	(revision 3b904abae77229f4a6547eca759b3cc1a5148855)
++++ b/app/src/main/java/com/example/eventapp/model/Event.kt	(date 1765472124000)
+@@ -7,10 +7,8 @@
+     val time: String,
+     val location: String,
+     val description: String,
+-    val capacity: Int?,
++    val capacity: Int,
+     val status: String,
+     val created_at: String,
+     val updated_at: String
+ )
+-
+-
+Index: build.gradle.kts
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>// Top-level build file where you can add configuration options common to all sub-projects/modules.\r\nplugins {\r\n    alias(libs.plugins.android.application) apply false\r\n    alias(libs.plugins.kotlin.android) apply false\r\n    alias(libs.plugins.kotlin.compose) apply false\r\n}\r\n
+===================================================================
+diff --git a/build.gradle.kts b/build.gradle.kts
+--- a/build.gradle.kts	(revision 3b904abae77229f4a6547eca759b3cc1a5148855)
++++ b/build.gradle.kts	(date 1765465812000)
+@@ -1,4 +1,3 @@
+-// Top-level build file where you can add configuration options common to all sub-projects/modules.
+ plugins {
+     alias(libs.plugins.android.application) apply false
+     alias(libs.plugins.kotlin.android) apply false
+Index: app/src/main/res/layout/activity_main.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<LinearLayout xmlns:android=\"http://schemas.android.com/apk/res/android\"\r\n    android:orientation=\"vertical\"\r\n    android:layout_width=\"match_parent\"\r\n    android:layout_height=\"match_parent\"\r\n    android:padding=\"16dp\">\r\n\r\n    <Button\r\n        android:id=\"@+id/btnOpenCreate\"\r\n        android:layout_width=\"match_parent\"\r\n        android:layout_height=\"wrap_content\"\r\n        android:text=\"Create Event\" />\r\n\r\n    <androidx.recyclerview.widget.RecyclerView\r\n        android:id=\"@+id/rvEvents\"\r\n        android:layout_width=\"match_parent\"\r\n        android:layout_height=\"match_parent\"\r\n        android:layout_marginTop=\"12dp\" />\r\n\r\n</LinearLayout>\r\n
+===================================================================
+diff --git a/app/src/main/res/layout/activity_main.xml b/app/src/main/res/layout/activity_main.xml
+--- a/app/src/main/res/layout/activity_main.xml	(revision 3b904abae77229f4a6547eca759b3cc1a5148855)
++++ b/app/src/main/res/layout/activity_main.xml	(date 1765469052000)
+@@ -1,20 +1,34 @@
+-<?xml version="1.0" encoding="utf-8"?>
+ <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+     android:orientation="vertical"
++    android:padding="16dp"
+     android:layout_width="match_parent"
+-    android:layout_height="match_parent"
+-    android:padding="16dp">
++    android:layout_height="match_parent">
+ 
+     <Button
+-        android:id="@+id/btnOpenCreate"
++        android:id="@+id/btnCreateEvent"
+         android:layout_width="match_parent"
+         android:layout_height="wrap_content"
+-        android:text="Create Event" />
++        android:text="Create Event"/>
+ 
++    <Button
++        android:id="@+id/btnGetEventById"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:text="Get Event by ID"
++        android:layout_marginTop="12dp"/>
++
++    <Button
++        android:id="@+id/btnGetEventByDate"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:text="Get Event by Date"
++        android:layout_marginTop="12dp"/>
++
++    <!-- Tambahkan RecyclerView di bawah tombol -->
+     <androidx.recyclerview.widget.RecyclerView
+         android:id="@+id/rvEvents"
+         android:layout_width="match_parent"
+-        android:layout_height="match_parent"
+-        android:layout_marginTop="12dp" />
+-
++        android:layout_height="0dp"
++        android:layout_weight="1"
++        android:layout_marginTop="16dp"/>
+ </LinearLayout>

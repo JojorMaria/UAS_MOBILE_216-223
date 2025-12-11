@@ -1,0 +1,34 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <Button
+        android:id="@+id/btnCreateEvent"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Create Event"/>
+
+    <Button
+        android:id="@+id/btnGetEventById"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Get Event by ID"
+        android:layout_marginTop="12dp"/>
+
+    <Button
+        android:id="@+id/btnGetEventByDate"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Get Event by Date"
+        android:layout_marginTop="12dp"/>
+
+    <!-- Tambahkan RecyclerView di bawah tombol -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvEvents"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="16dp"/>
+</LinearLayout>

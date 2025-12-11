@@ -1,0 +1,206 @@
+Index: app/src/main/res/layout/activity_create_event.xml
+===================================================================
+diff --git a/app/src/main/res/layout/activity_create_event.xml b/app/src/main/res/layout/activity_create_event.xml
+deleted file mode 100644
+--- a/app/src/main/res/layout/activity_create_event.xml	(revision 3b904abae77229f4a6547eca759b3cc1a5148855)
++++ /dev/null	(revision 3b904abae77229f4a6547eca759b3cc1a5148855)
+@@ -1,63 +0,0 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+-    android:layout_width="match_parent"
+-    android:layout_height="match_parent"
+-    android:padding="16dp">
+-
+-    <LinearLayout
+-        android:orientation="vertical"
+-        android:layout_width="match_parent"
+-        android:layout_height="wrap_content">
+-
+-        <EditText
+-            android:id="@+id/etTitle"
+-            android:layout_width="match_parent"
+-            android:layout_height="wrap_content"
+-            android:hint="Title"/>
+-
+-        <EditText
+-            android:id="@+id/etDate"
+-            android:layout_width="match_parent"
+-            android:layout_height="wrap_content"
+-            android:hint="Date (YYYY-MM-DD)"/>
+-
+-        <EditText
+-            android:id="@+id/etTime"
+-            android:layout_width="match_parent"
+-            android:layout_height="wrap_content"
+-            android:hint="Time (HH:MM:SS)"/>
+-
+-        <EditText
+-            android:id="@+id/etLocation"
+-            android:layout_width="match_parent"
+-            android:layout_height="wrap_content"
+-            android:hint="Location"/>
+-
+-        <EditText
+-            android:id="@+id/etDescription"
+-            android:layout_width="match_parent"
+-            android:layout_height="wrap_content"
+-            android:hint="Description"/>
+-
+-        <EditText
+-            android:id="@+id/etCapacity"
+-            android:layout_width="match_parent"
+-            android:layout_height="wrap_content"
+-            android:hint="Capacity"
+-            android:inputType="number"/>
+-
+-        <EditText
+-            android:id="@+id/etStatus"
+-            android:layout_width="match_parent"
+-            android:layout_height="wrap_content"
+-            android:hint="Status (ongoing/completed/upcoming/cancelled)"/>
+-
+-        <Button
+-            android:id="@+id/btnCreateEvent"
+-            android:layout_width="match_parent"
+-            android:layout_height="wrap_content"
+-            android:text="Create Event"
+-            android:layout_marginTop="12dp"/>
+-
+-    </LinearLayout>
+-</ScrollView>
+Index: app/src/main/java/com/example/eventapp/CreateEventActivity.kt
+===================================================================
+diff --git a/app/src/main/java/com/example/eventapp/CreateEventActivity.kt b/app/src/main/java/com/example/eventapp/CreateEventActivity.kt
+deleted file mode 100644
+--- a/app/src/main/java/com/example/eventapp/CreateEventActivity.kt	(revision 3b904abae77229f4a6547eca759b3cc1a5148855)
++++ /dev/null	(revision 3b904abae77229f4a6547eca759b3cc1a5148855)
+@@ -1,85 +0,0 @@
+-package com.example.eventapp
+-
+-import android.os.Bundle
+-import android.widget.Toast
+-import androidx.appcompat.app.AppCompatActivity
+-import androidx.lifecycle.lifecycleScope
+-import com.example.eventapp.databinding.ActivityCreateEventBinding
+-import com.example.eventapp.network.ApiClient
+-import kotlinx.coroutines.launch
+-
+-class CreateEventActivity : AppCompatActivity() {
+-
+-    private lateinit var binding: ActivityCreateEventBinding
+-
+-    override fun onCreate(savedInstanceState: Bundle?) {
+-        super.onCreate(savedInstanceState)
+-        binding = ActivityCreateEventBinding.inflate(layoutInflater)
+-        setContentView(binding.root)
+-
+-        binding.btnCreateEvent.setOnClickListener {
+-            submitCreateEvent()
+-        }
+-    }
+-
+-    private fun submitCreateEvent() {
+-        // ambil input
+-        val title = binding.etTitle.text.toString().trim()
+-        val date = binding.etDate.text.toString().trim()
+-        val time = binding.etTime.text.toString().trim()
+-        val location = binding.etLocation.text.toString().trim()
+-        val description = binding.etDescription.text.toString().trim()
+-        val capacityText = binding.etCapacity.text.toString().trim()
+-        val status = binding.etStatus.text.toString().trim()
+-
+-        // validasi sederhana
+-        if (title.isEmpty() || date.isEmpty() || time.isEmpty() || location.isEmpty() || status.isEmpty()) {
+-            Toast.makeText(this, "Please fill title, date, time, location and status", Toast.LENGTH_SHORT).show()
+-            return
+-        }
+-
+-        val capacity = try {
+-            if (capacityText.isEmpty()) 0 else capacityText.toInt()
+-        } catch (e: NumberFormatException) {
+-            Toast.makeText(this, "Capacity must be a number", Toast.LENGTH_SHORT).show()
+-            return
+-        }
+-
+-        // disable button sementara
+-        binding.btnCreateEvent.isEnabled = false
+-        binding.btnCreateEvent.text = "Creating..."
+-
+-        lifecycleScope.launch {
+-            try {
+-                val response = ApiClient.instance.createEvent(
+-                    endpoint = "createEvent",
+-                    title = title,
+-                    date = date,
+-                    time = time,
+-                    location = location,
+-                    description = description,
+-                    capacity = capacity,
+-                    status = status
+-                )
+-
+-                // tampilkan pesan dan kembali jika berhasil
+-                Toast.makeText(this@CreateEventActivity, response.message, Toast.LENGTH_LONG).show()
+-
+-                if (response.status == 200 || response.status == 1 || response.message.contains("success", ignoreCase = true)) {
+-                    // tanda sukses: finish dan biar activity pemanggil refresh
+-                    setResult(RESULT_OK)
+-                    finish()
+-                } else {
+-                    // server balas tetapi tidak sukses
+-                    binding.btnCreateEvent.isEnabled = true
+-                    binding.btnCreateEvent.text = "Create Event"
+-                }
+-            } catch (e: Exception) {
+-                e.printStackTrace()
+-                Toast.makeText(this@CreateEventActivity, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+-                binding.btnCreateEvent.isEnabled = true
+-                binding.btnCreateEvent.text = "Create Event"
+-            }
+-        }
+-    }
+-}
+Index: .idea/render.experimental.xml
+===================================================================
+diff --git a/.idea/render.experimental.xml b/.idea/render.experimental.xml
+new file mode 100644
+--- /dev/null	(date 1765468496000)
++++ b/.idea/render.experimental.xml	(date 1765468496000)
+@@ -0,0 +1,6 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="RenderSettings">
++    <option name="showDecorations" value="true" />
++  </component>
++</project>
+\ No newline at end of file
+Index: app/src/main/res/xml/network_security_config.xml
+===================================================================
+diff --git a/app/src/main/res/xml/network_security_config.xml b/app/src/main/res/xml/network_security_config.xml
+new file mode 100644
+--- /dev/null	(date 1765471072000)
++++ b/app/src/main/res/xml/network_security_config.xml	(date 1765471072000)
+@@ -0,0 +1,4 @@
++<?xml version="1.0" encoding="utf-8"?>
++<network-security-config>
++    <base-config cleartextTrafficPermitted="true" />
++</network-security-config>
+Index: app/src/main/java/com/example/eventapp/model/EventRequest.kt
+===================================================================
+diff --git a/app/src/main/java/com/example/eventapp/model/EventRequest.kt b/app/src/main/java/com/example/eventapp/model/EventRequest.kt
+new file mode 100644
+--- /dev/null	(date 1765472156000)
++++ b/app/src/main/java/com/example/eventapp/model/EventRequest.kt	(date 1765472156000)
+@@ -0,0 +1,12 @@
++package com.example.eventapp.model
++
++data class EventRequest(
++    val endpoint: String = "createEvent",
++    val title: String,
++    val date: String,
++    val time: String,
++    val location: String,
++    val description: String,
++    val capacity: Int,
++    val status: String
++)
