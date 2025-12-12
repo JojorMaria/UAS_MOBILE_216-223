@@ -1,34 +1,24 @@
 package com.example.eventapp.network
 
-import com.example.eventapp.model.Event
+import com.example.eventapp.model.EventRequest
 import com.example.eventapp.model.EventResponse
-import retrofit2.http.*
-
+import retrofit2.http.Body
+import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.Query
 
 interface ApiService {
 
     @GET("api.php")
-    suspend fun getEvents(
-        @Query("endpoint") endpoint: String = "events"
-    ): EventResponse
+    suspend fun getEvents(@Query("endpoint") endpoint: String = "events"): EventResponse
 
-    @FormUrlEncoded
     @POST("api.php")
-    suspend fun createEvent(
-        @Field("endpoint") endpoint: String = "createEvent",
-        @Field("title") title: String,
-        @Field("date") date: String,
-        @Field("time") time: String,
-        @Field("location") location: String,
-        @Field("description") description: String,
-        @Field("capacity") capacity: Int,
-        @Field("status") status: String
-    ): EventResponse
+    suspend fun createEvent(@Body event: EventRequest): EventResponse
 
     @GET("api.php")
     suspend fun getEventById(
         @Query("endpoint") endpoint: String = "eventById",
-        @Query("id") id: Int
+        @Query("id") id: String
     ): EventResponse
 
     @GET("api.php")
@@ -37,6 +27,3 @@ interface ApiService {
         @Query("date") date: String
     ): EventResponse
 }
-
-
-

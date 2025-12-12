@@ -4,7 +4,6 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object ApiClient {
-
     private const val BASE_URL = "http://104.248.153.158/event-api/"
 
     val instance: ApiService by lazy {
