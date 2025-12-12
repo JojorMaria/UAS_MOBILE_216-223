@@ -1,5 +1,6 @@
 package com.example.eventapp
 
+//Huawei Januaria
 import android.app.AlertDialog
 import android.os.Bundle
 import android.widget.EditText
